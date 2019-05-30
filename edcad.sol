@@ -77,12 +77,55 @@ contract OwnerHelper
     {
         require(_to != owner);
         require(_to != address(0x0));
+        emit OwnerTransferPropose(owner, _to);
         owner = _to;
-        OwnerTransferPropose(owner, _to);
+        
     }
 }
 
-contract ChainTree is IERC20, OwnerHelper{
+contract Pausable is OwnerHelper {
+  event Pause();
+  event Unpause();
+  event NotPausable();
+
+  bool public paused = false;
+  bool public canPause = true;
+
+
+  modifier whenNotPaused() {
+    require(!paused || msg.sender == owner);
+    _;
+  }
+
+
+  modifier whenPaused() {
+    require(paused);
+    _;
+  }
+
+
+    function pause() onlyOwner whenNotPaused public {
+        require(canPause == true);
+        paused = true;
+        emit Pause();
+    }
+
+
+  function unpause() onlyOwner whenPaused public {
+    require(paused == true);
+    paused = false;
+    emit Unpause();
+  }
+  
+
+    function notPausable() onlyOwner public{
+        paused = false;
+        canPause = false;
+        emit NotPausable();
+    }
+}
+
+contract ChainTree is IERC20, Pausable{
     using SafeMath for uint256;
 
     string public name;
@@ -147,35 +190,34 @@ contract ChainTree is IERC20, OwnerHelper{
         return _allowed[owner][spender];
     }
 
-    function transfer(address to, uint256 value) public returns (bool) {
+    function transfer(address to, uint256 value) public whenNotPaused returns (bool) {
 
         require(balances[msg.sender] >= value);
         require(isTransferLock(msg.sender) == false);
         
-        balances[msg.sender] = balances[msg.sender].sub(value);
-        balances[to] = balances[to].add(value);
-        
-        emit Transfer(msg.sender, to, value);
+        _transfer(msg.sender, to, value);
         
         return true;
     }
 
-    function approve(address spender, uint256 value) public returns (bool) {
+    function approve(address spender, uint256 value) public whenNotPaused returns (bool) {
         require(spender != address(0));
+        require(isTransferLock(msg.sender) == false);
 
         _allowed[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 value) public returns (bool) {
+    function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+        require(isTransferLock(msg.sender) == false);
         _allowed[from][msg.sender] = _allowed[from][msg.sender].sub(value);
         _transfer(from, to, value);
         emit Approval(from, msg.sender, _allowed[from][msg.sender]);
         return true;
     }
 
-    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+    function increaseAllowance(address spender, uint256 addedValue) public whenNotPaused returns (bool) {
         require(spender != address(0));
 
         _allowed[msg.sender][spender] = _allowed[msg.sender][spender].add(addedValue);
@@ -183,7 +225,7 @@ contract ChainTree is IERC20, OwnerHelper{
         return true;
     }
 
-    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+    function decreaseAllowance(address spender, uint256 subtractedValue) public whenNotPaused returns (bool) {
         require(spender != address(0));
 
         _allowed[msg.sender][spender] = _allowed[msg.sender][spender].sub(subtractedValue);
@@ -198,26 +240,5 @@ contract ChainTree is IERC20, OwnerHelper{
         balances[to] = balances[to].add(value);
         emit Transfer(from, to, value);
     }
-
-    function _mint(address account, uint256 value) internal {
-        require(account != address(0));
-
-        totalSupply = totalSupply.add(value);
-        balances[account] = balances[account].add(value);
-        emit Transfer(address(0), account, value);
-    }
-
-    function _burn(address account, uint256 value) internal {
-        require(account != address(0));
-
-        totalSupply = totalSupply.sub(value);
-        balances[account] = balances[account].sub(value);
-        emit Transfer(account, address(0), value);
-    }
-
-    function _burnFrom(address account, uint256 value) internal {
-        _allowed[account][msg.sender] = _allowed[account][msg.sender].sub(value);
-        _burn(account, value);
-        emit Approval(account, msg.sender, _allowed[account][msg.sender]);
-    }
 }
+
