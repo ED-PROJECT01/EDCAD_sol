@@ -193,7 +193,7 @@ contract ChainTree is IERC20, Pausable{
     function transfer(address to, uint256 value) public whenNotPaused returns (bool) {
 
         require(balances[msg.sender] >= value);
-        require(isTransferLock(msg.sender) == false);
+        
         
         _transfer(msg.sender, to, value);
         
@@ -235,6 +235,8 @@ contract ChainTree is IERC20, Pausable{
 
     function _transfer(address from, address to, uint256 value) internal {
         require(to != address(0));
+        require(isTransferLock(from) == false);
+        require(isTransferLock(to) == false);
 
         balances[from] = balances[from].sub(value);
         balances[to] = balances[to].add(value);
